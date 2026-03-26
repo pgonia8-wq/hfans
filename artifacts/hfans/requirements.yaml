@@ -1,0 +1,27 @@
+packages:
+  "@worldcoin/minikit-js": "Integration with World App MiniKit for Wallet Auth, World ID, and WLD payments"
+  "zustand": "Lightweight state management for user session and UI states"
+  "framer-motion": "Smooth entry animations, page transitions, and interactive UI feedback"
+  "recharts": "Creator dashboard analytics and earnings visualization"
+  "date-fns": "Human-readable relative time formatting for posts and messages"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for safely merging Tailwind classes in generic components"
+
+images:
+  - path: "artifacts/hfans/public/images/hero-bg.png"
+    description: "Dark sensual abstract gradient mesh in deep obsidian black with electric neon blue accents and subtle light leaks, premium and mysterious"
+    aspect_ratio: "9:16"
+  - path: "artifacts/hfans/public/images/logo.png"
+    description: "Minimalist sharp electric blue geometric monogram 'H' on transparent background, sleek and modern adult platform aesthetic"
+    aspect_ratio: "1:1"
+  - path: "artifacts/hfans/public/images/default-avatar.png"
+    description: "Abstract stylish silhouette figure in deep shadows with electric blue rim lighting, premium profile placeholder"
+    aspect_ratio: "1:1"
+  - path: "artifacts/hfans/public/images/default-banner.png"
+    description: "Dark carbon fiber texture with subtle glowing blue neon edge lines, sleek modern background"
+    aspect_ratio: "16:9"
+
+notes:
+  - MiniKit integration assumes presence in World App webview; gracefully falls back to mock modes for desktop dev where MiniKit is unavailable.
+  - All API hooks are imported from the workspace @workspace/api-client-react package.
+  - Dark mode is enforced by default via CSS variables to fit the aesthetic direction.

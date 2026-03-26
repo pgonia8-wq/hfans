@@ -1,22 +1,41 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: H Fans API - World App Mini App creator platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication and World ID
+  - name: users
+    description: User profiles and settings
+  - name: creators
+    description: Creator management and dashboard
+  - name: content
+    description: Posts, media, stories
+  - name: subscriptions
+    description: Subscription management
+  - name: payments
+    description: Payment processing and verification
+  - name: messages
+    description: Direct messaging
+  - name: livestream
+    description: Live streaming
+  - name: analytics
+    description: Analytics and statistics
+  - name: moderation
+    description: Content moderation
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +43,1023 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/world-id/verify:
+    post:
+      operationId: verifyWorldId
+      tags: [auth]
+      summary: Verify World ID proof
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorldIdVerifyRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorldIdVerifyResponse"
+
+  /auth/wallet:
+    post:
+      operationId: walletAuth
+      tags: [auth]
+      summary: Authenticate with wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletAuthRequest"
+      responses:
+        "200":
+          description: Auth result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # USERS
+  /users/{username}:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user profile by username
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/profile:
+    put:
+      operationId: updateProfile
+      tags: [users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/become-creator:
+    post:
+      operationId: becomeCreator
+      tags: [users]
+      summary: Apply to become a creator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BecomeCreatorRequest"
+      responses:
+        "200":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # CONTENT / FEED
+  /feed:
+    get:
+      operationId: getFeed
+      tags: [content]
+      summary: Get personalized feed
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Feed posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+
+  /posts:
+    get:
+      operationId: getPosts
+      tags: [content]
+      summary: List posts
+      parameters:
+        - name: creatorId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Posts list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+
+    post:
+      operationId: createPost
+      tags: [content]
+      summary: Create a new post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}:
+    get:
+      operationId: getPost
+      tags: [content]
+      summary: Get post by ID
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+    put:
+      operationId: updatePost
+      tags: [content]
+      summary: Update post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+    delete:
+      operationId: deletePost
+      tags: [content]
+      summary: Delete post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /posts/{postId}/like:
+    post:
+      operationId: likePost
+      tags: [content]
+      summary: Like or unlike a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Like status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+
+  /posts/{postId}/bookmark:
+    post:
+      operationId: bookmarkPost
+      tags: [content]
+      summary: Bookmark or unbookmark a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bookmark status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkResponse"
+
+  /posts/{postId}/comments:
+    get:
+      operationId: getPostComments
+      tags: [content]
+      summary: Get comments for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentListResponse"
+
+    post:
+      operationId: addComment
+      tags: [content]
+      summary: Add a comment
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentRequest"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /posts/bookmarks:
+    get:
+      operationId: getBookmarks
+      tags: [content]
+      summary: Get bookmarked posts
+      responses:
+        "200":
+          description: Bookmarked posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+
+  /stories:
+    get:
+      operationId: getStories
+      tags: [content]
+      summary: Get active stories
+      responses:
+        "200":
+          description: Stories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryListResponse"
+
+    post:
+      operationId: createStory
+      tags: [content]
+      summary: Create a story
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStoryRequest"
+      responses:
+        "201":
+          description: Created story
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Story"
+
+  # SUBSCRIPTIONS
+  /subscriptions:
+    get:
+      operationId: getSubscriptions
+      tags: [subscriptions]
+      summary: Get my subscriptions
+      responses:
+        "200":
+          description: Subscriptions list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionListResponse"
+
+  /subscriptions/subscribe:
+    post:
+      operationId: subscribe
+      tags: [subscriptions]
+      summary: Subscribe to a creator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeRequest"
+      responses:
+        "200":
+          description: Subscription initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInitResponse"
+
+  /subscriptions/{subscriptionId}/cancel:
+    post:
+      operationId: cancelSubscription
+      tags: [subscriptions]
+      summary: Cancel a subscription
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /subscriptions/check/{creatorId}:
+    get:
+      operationId: checkSubscription
+      tags: [subscriptions]
+      summary: Check if subscribed to creator
+      parameters:
+        - name: creatorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subscription status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatus"
+
+  # PAYMENTS
+  /payments/initiate:
+    post:
+      operationId: initiatePayment
+      tags: [payments]
+      summary: Initiate a payment (subscription, PPV, tip)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiatePaymentRequest"
+      responses:
+        "200":
+          description: Payment details for MiniKit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInitResponse"
+
+  /payments/verify:
+    post:
+      operationId: verifyPayment
+      tags: [payments]
+      summary: Verify a completed payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPaymentRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyPaymentResponse"
+
+  /payments/history:
+    get:
+      operationId: getPaymentHistory
+      tags: [payments]
+      summary: Get payment history
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+
+  /payments/ppv/unlock:
+    post:
+      operationId: unlockPPV
+      tags: [payments]
+      summary: Unlock PPV content after payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnlockPPVRequest"
+      responses:
+        "200":
+          description: Unlock result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # MESSAGING
+  /messages/conversations:
+    get:
+      operationId: getConversations
+      tags: [messages]
+      summary: Get conversations list
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+
+  /messages/conversations/{userId}:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get messages in conversation
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /messages/mass-dm:
+    post:
+      operationId: sendMassDM
+      tags: [messages]
+      summary: Send mass DM to subscribers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MassDMRequest"
+      responses:
+        "200":
+          description: Mass DM sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # LIVE STREAMING
+  /livestream/start:
+    post:
+      operationId: startLivestream
+      tags: [livestream]
+      summary: Start a live stream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartLivestreamRequest"
+      responses:
+        "200":
+          description: Stream credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivestreamCredentials"
+
+  /livestream/end:
+    post:
+      operationId: endLivestream
+      tags: [livestream]
+      summary: End active live stream
+      responses:
+        "200":
+          description: Stream ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /livestream/active:
+    get:
+      operationId: getActiveLivestreams
+      tags: [livestream]
+      summary: Get active live streams
+      responses:
+        "200":
+          description: Active streams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivestreamListResponse"
+
+  /livestream/join/{streamId}:
+    post:
+      operationId: joinLivestream
+      tags: [livestream]
+      summary: Join a live stream
+      parameters:
+        - name: streamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Join credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivestreamJoinResponse"
+
+  # CREATOR DASHBOARD
+  /creator/dashboard:
+    get:
+      operationId: getCreatorDashboard
+      tags: [creators]
+      summary: Get creator dashboard overview
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorDashboard"
+
+  /creator/subscribers:
+    get:
+      operationId: getCreatorSubscribers
+      tags: [creators]
+      summary: Get creator's subscribers
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Subscribers list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriberListResponse"
+
+  /creator/earnings:
+    get:
+      operationId: getCreatorEarnings
+      tags: [creators]
+      summary: Get creator earnings
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year, all]
+            default: month
+      responses:
+        "200":
+          description: Earnings data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EarningsResponse"
+
+  /creator/analytics:
+    get:
+      operationId: getCreatorAnalytics
+      tags: [analytics]
+      summary: Get creator analytics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+            default: month
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+
+  /creator/vault:
+    get:
+      operationId: getVault
+      tags: [creators]
+      summary: Get media vault
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Vault items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaultListResponse"
+
+  /creator/payout:
+    post:
+      operationId: requestPayout
+      tags: [creators]
+      summary: Request a payout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayoutRequest"
+      responses:
+        "200":
+          description: Payout initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /creator/lists:
+    get:
+      operationId: getFanLists
+      tags: [creators]
+      summary: Get fan lists
+      responses:
+        "200":
+          description: Fan lists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FanListResponse"
+
+    post:
+      operationId: createFanList
+      tags: [creators]
+      summary: Create a fan list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFanListRequest"
+      responses:
+        "201":
+          description: Created list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FanList"
+
+  /creator/settings:
+    get:
+      operationId: getCreatorSettings
+      tags: [creators]
+      summary: Get creator settings
+      responses:
+        "200":
+          description: Creator settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorSettings"
+
+    put:
+      operationId: updateCreatorSettings
+      tags: [creators]
+      summary: Update creator settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCreatorSettingsRequest"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorSettings"
+
+  /creator/goals:
+    get:
+      operationId: getGoals
+      tags: [creators]
+      summary: Get fundraising goals
+      responses:
+        "200":
+          description: Goals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalListResponse"
+
+    post:
+      operationId: createGoal
+      tags: [creators]
+      summary: Create a fundraising goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Created goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+
+  # SEARCH
+  /search/creators:
+    get:
+      operationId: searchCreators
+      tags: [users]
+      summary: Search creators
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorListResponse"
+
+  # TIPS
+  /tips:
+    post:
+      operationId: sendTip
+      tags: [payments]
+      summary: Initiate a tip payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendTipRequest"
+      responses:
+        "200":
+          description: Tip payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInitResponse"
+
+  # MEDIA UPLOAD
+  /media/upload-url:
+    post:
+      operationId: getUploadUrl
+      tags: [content]
+      summary: Get presigned upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+
+  # POLLS
+  /polls/{postId}/vote:
+    post:
+      operationId: votePoll
+      tags: [content]
+      summary: Vote on a poll
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VotePollRequest"
+      responses:
+        "200":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PollResult"
+
+  # NOTIFICATIONS
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [users]
+      summary: Get notifications
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +1067,1155 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    # AUTH
+    WorldIdVerifyRequest:
+      type: object
+      properties:
+        payload:
+          type: object
+          additionalProperties: true
+        action:
+          type: string
+        signal:
+          type: string
+      required: [payload, action]
+
+    WorldIdVerifyResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        nullifierHash:
+          type: string
+        credentialType:
+          type: string
+      required: [verified]
+
+    WalletAuthRequest:
+      type: object
+      properties:
+        payload:
+          type: object
+          additionalProperties: true
+        nonce:
+          type: string
+        address:
+          type: string
+      required: [payload, nonce, address]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        token:
+          type: string
+        isNew:
+          type: boolean
+      required: [user]
+
+    # USER / PROFILE
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        bannerUrl:
+          type: string
+        walletAddress:
+          type: string
+        role:
+          type: string
+          enum: [fan, creator, admin]
+        isWorldIdVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, username, role]
+
+    CreatorProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        bannerUrl:
+          type: string
+        subscriptionPriceWld:
+          type: string
+        subscriberCount:
+          type: integer
+        postCount:
+          type: integer
+        likeCount:
+          type: integer
+        isSubscribed:
+          type: boolean
+        isVerified:
+          type: boolean
+        isWorldIdVerified:
+          type: boolean
+        socialLinks:
+          $ref: "#/components/schemas/SocialLinks"
+      required: [id, username]
+
+    SocialLinks:
+      type: object
+      properties:
+        twitter:
+          type: string
+        instagram:
+          type: string
+        tiktok:
+          type: string
+        spotify:
+          type: string
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        bannerUrl:
+          type: string
+        socialLinks:
+          $ref: "#/components/schemas/SocialLinks"
+
+    BecomeCreatorRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+        subscriptionPriceWld:
+          type: string
+        contentCategories:
+          type: array
+          items:
+            type: string
+      required: [subscriptionPriceWld]
+
+    CreatorListResponse:
+      type: object
+      properties:
+        creators:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatorProfile"
+        total:
+          type: integer
+        page:
+          type: integer
+      required: [creators, total, page]
+
+    # CONTENT / POSTS
+    MediaItem:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        type:
+          type: string
+          enum: [image, video, audio]
+        thumbnailUrl:
+          type: string
+        blurUrl:
+          type: string
+        duration:
+          type: integer
+      required: [id, url, type]
+
+    PollOption:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        voteCount:
+          type: integer
+      required: [id, text, voteCount]
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+        creatorId:
+          type: string
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        text:
+          type: string
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaItem"
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        isUnlocked:
+          type: boolean
+        isFreeForSubscribers:
+          type: boolean
+        likeCount:
+          type: integer
+        commentCount:
+          type: integer
+        isLiked:
+          type: boolean
+        isBookmarked:
+          type: boolean
+        postType:
+          type: string
+          enum: [text, photo, video, poll, quiz]
+        pollOptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PollOption"
+        pollEndsAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+        goalAmount:
+          type: string
+        goalCurrent:
+          type: string
+        goalTitle:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, creatorId, createdAt]
+
+    CreatePostRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        mediaIds:
+          type: array
+          items:
+            type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        isFreeForSubscribers:
+          type: boolean
+        postType:
+          type: string
+          enum: [text, photo, video, poll, quiz]
+        pollOptions:
+          type: array
+          items:
+            type: string
+        pollEndsAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+        goalAmount:
+          type: string
+        goalTitle:
+          type: string
+
+    UpdatePostRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+
+    PostListResponse:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        total:
+          type: integer
+        page:
+          type: integer
+        hasMore:
+          type: boolean
+      required: [posts, total, page, hasMore]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        postId:
+          type: string
+        userId:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, postId, userId, text, createdAt]
+
+    AddCommentRequest:
+      type: object
+      properties:
+        text:
+          type: string
+      required: [text]
+
+    CommentListResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        total:
+          type: integer
+      required: [comments, total]
+
+    LikeResponse:
+      type: object
+      properties:
+        liked:
+          type: boolean
+        likeCount:
+          type: integer
+      required: [liked, likeCount]
+
+    BookmarkResponse:
+      type: object
+      properties:
+        bookmarked:
+          type: boolean
+      required: [bookmarked]
+
+    Story:
+      type: object
+      properties:
+        id:
+          type: string
+        creatorId:
+          type: string
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        mediaUrl:
+          type: string
+        mediaType:
+          type: string
+          enum: [image, video]
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        isUnlocked:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        viewCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, creatorId, createdAt]
+
+    CreateStoryRequest:
+      type: object
+      properties:
+        mediaId:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+      required: [mediaId]
+
+    StoryListResponse:
+      type: object
+      properties:
+        stories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Story"
+      required: [stories]
+
+    VotePollRequest:
+      type: object
+      properties:
+        optionId:
+          type: string
+      required: [optionId]
+
+    PollResult:
+      type: object
+      properties:
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/PollOption"
+        userVotedOptionId:
+          type: string
+      required: [options]
+
+    # SUBSCRIPTIONS
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        fanId:
+          type: string
+        creatorId:
+          type: string
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        priceWld:
+          type: string
+        status:
+          type: string
+          enum: [active, expired, cancelled]
+        startedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        autoRenew:
+          type: boolean
+      required: [id, fanId, creatorId, status]
+
+    SubscribeRequest:
+      type: object
+      properties:
+        creatorId:
+          type: string
+        months:
+          type: integer
+          default: 1
+      required: [creatorId]
+
+    SubscriptionListResponse:
+      type: object
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+        total:
+          type: integer
+      required: [subscriptions, total]
+
+    SubscriptionStatus:
+      type: object
+      properties:
+        isSubscribed:
+          type: boolean
+        subscription:
+          $ref: "#/components/schemas/Subscription"
+      required: [isSubscribed]
+
+    # PAYMENTS
+    InitiatePaymentRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [subscription, ppv, tip, custom_request]
+        recipientId:
+          type: string
+        contentId:
+          type: string
+        amountWld:
+          type: string
+        note:
+          type: string
+      required: [type, recipientId]
+
+    PaymentInitResponse:
+      type: object
+      properties:
+        referenceId:
+          type: string
+        to:
+          type: string
+        amountWld:
+          type: string
+        description:
+          type: string
+        tokens:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [referenceId, to, amountWld, description]
+
+    VerifyPaymentRequest:
+      type: object
+      properties:
+        referenceId:
+          type: string
+        transactionId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+      required: [referenceId]
+
+    VerifyPaymentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        status:
+          type: string
+          enum: [verified, pending, failed]
+        unlocked:
+          type: boolean
+      required: [success, status]
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [subscription, ppv, tip, payout, custom_request]
+        amountWld:
+          type: string
+        platformFeeWld:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, amountWld, status, createdAt]
+
+    PaymentListResponse:
+      type: object
+      properties:
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+        total:
+          type: integer
+        page:
+          type: integer
+      required: [payments, total, page]
+
+    UnlockPPVRequest:
+      type: object
+      properties:
+        contentId:
+          type: string
+        contentType:
+          type: string
+          enum: [post, story, message]
+        referenceId:
+          type: string
+      required: [contentId, contentType, referenceId]
+
+    SendTipRequest:
+      type: object
+      properties:
+        creatorId:
+          type: string
+        amountWld:
+          type: string
+        contentId:
+          type: string
+        note:
+          type: string
+        streamId:
+          type: string
+      required: [creatorId, amountWld]
+
+    PayoutRequest:
+      type: object
+      properties:
+        amountWld:
+          type: string
+        walletAddress:
+          type: string
+      required: [amountWld]
+
+    # MESSAGES
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        senderId:
+          type: string
+        receiverId:
+          type: string
+        text:
+          type: string
+        mediaUrl:
+          type: string
+        mediaType:
+          type: string
+          enum: [image, video]
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        isUnlocked:
+          type: boolean
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, senderId, receiverId, createdAt]
+
+    SendMessageRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        mediaId:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+
+    MessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        total:
+          type: integer
+        page:
+          type: integer
+      required: [messages, total, page]
+
+    Conversation:
+      type: object
+      properties:
+        userId:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        lastMessage:
+          $ref: "#/components/schemas/Message"
+        unreadCount:
+          type: integer
+      required: [userId]
+
+    ConversationListResponse:
+      type: object
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+      required: [conversations]
+
+    MassDMRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        mediaId:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        listId:
+          type: string
+      required: [text]
+
+    # LIVESTREAM
+    StartLivestreamRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        tipMenuItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/TipMenuItem"
+      required: [title]
+
+    TipMenuItem:
+      type: object
+      properties:
+        label:
+          type: string
+        amountWld:
+          type: string
+      required: [label, amountWld]
+
+    LivestreamCredentials:
+      type: object
+      properties:
+        streamId:
+          type: string
+        roomName:
+          type: string
+        token:
+          type: string
+        serverUrl:
+          type: string
+      required: [streamId, roomName, token]
+
+    LivestreamJoinResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        serverUrl:
+          type: string
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        isUnlocked:
+          type: boolean
+      required: [token, serverUrl]
+
+    Livestream:
+      type: object
+      properties:
+        id:
+          type: string
+        creatorId:
+          type: string
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        title:
+          type: string
+        viewerCount:
+          type: integer
+        isPpv:
+          type: boolean
+        ppvPriceWld:
+          type: string
+        tipMenuItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/TipMenuItem"
+        startedAt:
+          type: string
+          format: date-time
+      required: [id, creatorId, title]
+
+    LivestreamListResponse:
+      type: object
+      properties:
+        streams:
+          type: array
+          items:
+            $ref: "#/components/schemas/Livestream"
+      required: [streams]
+
+    # CREATOR DASHBOARD
+    CreatorDashboard:
+      type: object
+      properties:
+        totalEarningsWld:
+          type: string
+        pendingBalanceWld:
+          type: string
+        subscriberCount:
+          type: integer
+        newSubscribersThisMonth:
+          type: integer
+        renewalRate:
+          type: number
+        totalViews:
+          type: integer
+        totalLikes:
+          type: integer
+        totalTips:
+          type: integer
+        topFans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopFan"
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+        earningsChart:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+      required: [totalEarningsWld, subscriberCount]
+
+    TopFan:
+      type: object
+      properties:
+        userId:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        totalSpentWld:
+          type: string
+        rank:
+          type: integer
+      required: [userId, rank]
+
+    ChartDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        value:
+          type: number
+        label:
+          type: string
+      required: [date, value]
+
+    SubscriberListResponse:
+      type: object
+      properties:
+        subscribers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriberInfo"
+        total:
+          type: integer
+        page:
+          type: integer
+      required: [subscribers, total, page]
+
+    SubscriberInfo:
+      type: object
+      properties:
+        userId:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        subscribedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        totalSpentWld:
+          type: string
+        isTopFan:
+          type: boolean
+      required: [userId]
+
+    EarningsResponse:
+      type: object
+      properties:
+        totalWld:
+          type: string
+        subscriptionsWld:
+          type: string
+        ppvWld:
+          type: string
+        tipsWld:
+          type: string
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+      required: [totalWld]
+
+    AnalyticsResponse:
+      type: object
+      properties:
+        views:
+          type: integer
+        uniqueVisitors:
+          type: integer
+        likes:
+          type: integer
+        comments:
+          type: integer
+        newSubscribers:
+          type: integer
+        revenue:
+          type: string
+        engagementRate:
+          type: number
+        viewsChart:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        revenueChart:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        topPosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+      required: [views, likes, comments, newSubscribers]
+
+    VaultItem:
+      type: object
+      properties:
+        id:
+          type: string
+        mediaUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+        mediaType:
+          type: string
+          enum: [image, video]
+        usedInPostCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, mediaUrl, mediaType, createdAt]
+
+    VaultListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/VaultItem"
+        total:
+          type: integer
+        page:
+          type: integer
+      required: [items, total, page]
+
+    FanList:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        fanCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, fanCount]
+
+    FanListResponse:
+      type: object
+      properties:
+        lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/FanList"
+      required: [lists]
+
+    CreateFanListRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        fanIds:
+          type: array
+          items:
+            type: string
+      required: [name]
+
+    CreatorSettings:
+      type: object
+      properties:
+        subscriptionPriceWld:
+          type: string
+        welcomeMessageEnabled:
+          type: boolean
+        welcomeMessageText:
+          type: string
+        autoRenewEnabled:
+          type: boolean
+        commentsEnabled:
+          type: boolean
+        tipsEnabled:
+          type: boolean
+        watermarkEnabled:
+          type: boolean
+        platformWalletAddress:
+          type: string
+      required: [subscriptionPriceWld]
+
+    UpdateCreatorSettingsRequest:
+      type: object
+      properties:
+        subscriptionPriceWld:
+          type: string
+        welcomeMessageEnabled:
+          type: boolean
+        welcomeMessageText:
+          type: string
+        autoRenewEnabled:
+          type: boolean
+        commentsEnabled:
+          type: boolean
+        tipsEnabled:
+          type: boolean
+
+    Goal:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        targetAmountWld:
+          type: string
+        currentAmountWld:
+          type: string
+        isComplete:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, targetAmountWld, currentAmountWld]
+
+    GoalListResponse:
+      type: object
+      properties:
+        goals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Goal"
+      required: [goals]
+
+    CreateGoalRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        targetAmountWld:
+          type: string
+        postId:
+          type: string
+      required: [title, targetAmountWld]
+
+    UploadUrlRequest:
+      type: object
+      properties:
+        filename:
+          type: string
+        contentType:
+          type: string
+        folder:
+          type: string
+          enum: [posts, stories, messages, avatars, banners]
+      required: [filename, contentType]
+
+    UploadUrlResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        mediaId:
+          type: string
+        publicUrl:
+          type: string
+      required: [uploadUrl, mediaId, publicUrl]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [new_subscriber, tip, ppv_unlock, comment, like, message, livestream, renewal_reminder]
+        title:
+          type: string
+        body:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [id, type, title, isRead, createdAt]
+
+    NotificationListResponse:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unreadCount:
+          type: integer
+        total:
+          type: integer
+      required: [notifications, unreadCount, total]
