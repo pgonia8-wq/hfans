@@ -28,8 +28,9 @@ export const usersTable = pgTable("users", {
 export const creatorProfilesTable = pgTable("creator_profiles", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  // Base price for the default subscription tier
   subscriptionPriceWld: text("subscription_price_wld").default("1.0").notNull(),
-  status: creatorStatusEnum("status").default("pending").notNull(),
+  status: creatorStatusEnum("status").default("approved").notNull(),
   approvedAt: timestamp("approved_at"),
   totalEarningsWld: text("total_earnings_wld").default("0").notNull(),
   pendingBalanceWld: text("pending_balance_wld").default("0").notNull(),
@@ -37,7 +38,15 @@ export const creatorProfilesTable = pgTable("creator_profiles", {
   welcomeMessageText: text("welcome_message_text"),
   commentsEnabled: boolean("comments_enabled").default(true).notNull(),
   tipsEnabled: boolean("tips_enabled").default(true).notNull(),
+  // Price for paid DMs (null = free, "0" = messages disabled)
+  paidDmPriceWld: text("paid_dm_price_wld"),
+  // Minimum tip amount in WLD
+  minTipWld: text("min_tip_wld").default("0.1").notNull(),
+  // Free trial days for new subscribers
+  freeTrialDays: integer("free_trial_days").default(0).notNull(),
   watermarkEnabled: boolean("watermark_enabled").default(false).notNull(),
+  showSubscriberCount: boolean("show_subscriber_count").default(true).notNull(),
+  showPostCount: boolean("show_post_count").default(true).notNull(),
   contentCategories: text("content_categories").array(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

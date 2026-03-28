@@ -1,7 +1,8 @@
 import { Router } from "express";
 import {
   db, usersTable, creatorProfilesTable, subscriptionsTable, paymentsTable,
-  postsTable, fanListsTable, fanListMembersTable, livestreamsTable, notificationsTable
+  postsTable, fanListsTable, fanListMembersTable, livestreamsTable, notificationsTable,
+  subscriptionTiersTable, promoCodesTable,
 } from "@workspace/db";
 import { eq, and, desc, gte, sql, count } from "drizzle-orm";
 import { requireAuth, requireCreator, getUser } from "../lib/auth.js";
@@ -436,6 +437,165 @@ router.post("/goals", requireAuth, requireCreator, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error creating goal");
     res.status(500).json({ error: "Failed to create goal" });
+  }
+});
+
+// ─── Subscription Tiers ─────────────────────────────────────────────────────
+
+// GET /creator/tiers — list my tiers
+router.get("/tiers", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const tiers = await db.select().from(subscriptionTiersTable)
+      .where(eq(subscriptionTiersTable.creatorId, user.id))
+      .orderBy(subscriptionTiersTable.sortOrder);
+    res.json({ tiers });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get tiers" });
+  }
+});
+
+// POST /creator/tiers — create a tier
+router.post("/tiers", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const {
+      name, description, priceWld, benefits = [], trialDays = 0,
+      bundle3moDiscountPct = 0, bundle6moDiscountPct = 0, bundle12moDiscountPct = 0,
+    } = req.body;
+
+    if (!name || !priceWld) return res.status(400).json({ error: "name and priceWld required" });
+    if (parseFloat(priceWld) < 0) return res.status(400).json({ error: "Price must be >= 0" });
+
+    const existingTiers = await db.select({ id: subscriptionTiersTable.id })
+      .from(subscriptionTiersTable).where(eq(subscriptionTiersTable.creatorId, user.id));
+    if (existingTiers.length >= 10) return res.status(400).json({ error: "Max 10 tiers allowed" });
+
+    const [tier] = await db.insert(subscriptionTiersTable).values({
+      creatorId: user.id,
+      name: name.trim(),
+      description: description?.trim(),
+      priceWld,
+      benefits: Array.isArray(benefits) ? benefits : [],
+      trialDays: Math.max(0, parseInt(trialDays) || 0),
+      bundle3moDiscountPct: Math.min(100, Math.max(0, parseInt(bundle3moDiscountPct) || 0)),
+      bundle6moDiscountPct: Math.min(100, Math.max(0, parseInt(bundle6moDiscountPct) || 0)),
+      bundle12moDiscountPct: Math.min(100, Math.max(0, parseInt(bundle12moDiscountPct) || 0)),
+      sortOrder: existingTiers.length,
+    }).returning();
+
+    res.status(201).json({ tier });
+  } catch (err) {
+    req.log.error({ err }, "Error creating tier");
+    res.status(500).json({ error: "Failed to create tier" });
+  }
+});
+
+// PUT /creator/tiers/:tierId — update a tier
+router.put("/tiers/:tierId", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const [tier] = await db.select().from(subscriptionTiersTable)
+      .where(and(eq(subscriptionTiersTable.id, req.params.tierId), eq(subscriptionTiersTable.creatorId, user.id)))
+      .limit(1);
+    if (!tier) return res.status(404).json({ error: "Tier not found" });
+
+    const {
+      name, description, priceWld, benefits, trialDays,
+      bundle3moDiscountPct, bundle6moDiscountPct, bundle12moDiscountPct,
+      isActive, sortOrder,
+    } = req.body;
+
+    const updates: Partial<typeof subscriptionTiersTable.$inferInsert> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name.trim();
+    if (description !== undefined) updates.description = description?.trim();
+    if (priceWld !== undefined) updates.priceWld = priceWld;
+    if (benefits !== undefined) updates.benefits = Array.isArray(benefits) ? benefits : [];
+    if (trialDays !== undefined) updates.trialDays = Math.max(0, parseInt(trialDays) || 0);
+    if (bundle3moDiscountPct !== undefined) updates.bundle3moDiscountPct = Math.min(100, Math.max(0, parseInt(bundle3moDiscountPct) || 0));
+    if (bundle6moDiscountPct !== undefined) updates.bundle6moDiscountPct = Math.min(100, Math.max(0, parseInt(bundle6moDiscountPct) || 0));
+    if (bundle12moDiscountPct !== undefined) updates.bundle12moDiscountPct = Math.min(100, Math.max(0, parseInt(bundle12moDiscountPct) || 0));
+    if (isActive !== undefined) updates.isActive = Boolean(isActive);
+    if (sortOrder !== undefined) updates.sortOrder = parseInt(sortOrder) || 0;
+
+    const [updated] = await db.update(subscriptionTiersTable).set(updates)
+      .where(eq(subscriptionTiersTable.id, tier.id)).returning();
+    res.json({ tier: updated });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update tier" });
+  }
+});
+
+// DELETE /creator/tiers/:tierId — deactivate a tier
+router.delete("/tiers/:tierId", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const [tier] = await db.select().from(subscriptionTiersTable)
+      .where(and(eq(subscriptionTiersTable.id, req.params.tierId), eq(subscriptionTiersTable.creatorId, user.id)))
+      .limit(1);
+    if (!tier) return res.status(404).json({ error: "Tier not found" });
+    await db.update(subscriptionTiersTable).set({ isActive: false, updatedAt: new Date() })
+      .where(eq(subscriptionTiersTable.id, tier.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete tier" });
+  }
+});
+
+// ─── Promo Codes ────────────────────────────────────────────────────────────
+
+// GET /creator/promo-codes
+router.get("/promo-codes", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const codes = await db.select().from(promoCodesTable)
+      .where(eq(promoCodesTable.creatorId, user.id))
+      .orderBy(desc(promoCodesTable.createdAt));
+    res.json({ promoCodes: codes });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get promo codes" });
+  }
+});
+
+// POST /creator/promo-codes
+router.post("/promo-codes", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const { code, discountType, discountValue, maxUses, tierId, expiresAt } = req.body;
+    if (!code || !discountType || !discountValue) {
+      return res.status(400).json({ error: "code, discountType, discountValue required" });
+    }
+    if (!["percent", "fixed_wld"].includes(discountType)) {
+      return res.status(400).json({ error: "discountType must be percent or fixed_wld" });
+    }
+    const [pc] = await db.insert(promoCodesTable).values({
+      creatorId: user.id,
+      code: code.toUpperCase().trim(),
+      discountType,
+      discountValue: String(discountValue),
+      maxUses: maxUses ? parseInt(maxUses) : undefined,
+      tierId: tierId || undefined,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    }).returning();
+    res.status(201).json({ promoCode: pc });
+  } catch (err: any) {
+    if (err.code === "23505") return res.status(400).json({ error: "Promo code already exists" });
+    res.status(500).json({ error: "Failed to create promo code" });
+  }
+});
+
+// DELETE /creator/promo-codes/:id
+router.delete("/promo-codes/:id", requireAuth, requireCreator, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const [pc] = await db.select().from(promoCodesTable)
+      .where(and(eq(promoCodesTable.id, req.params.id), eq(promoCodesTable.creatorId, user.id)))
+      .limit(1);
+    if (!pc) return res.status(404).json({ error: "Not found" });
+    await db.delete(promoCodesTable).where(eq(promoCodesTable.id, pc.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete promo code" });
   }
 });
 

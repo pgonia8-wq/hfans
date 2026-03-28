@@ -1,80 +1,90 @@
 import { Router } from "express";
-import { db, usersTable, sessionsTable, creatorProfilesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, usersTable, sessionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { requireAuth, getUser } from "../lib/auth.js";
+import { hashMessage, recoverAddress } from "viem";
 
 const router = Router();
 
-const PLATFORM_APP_ID = process.env.WORLD_APP_ID || "app_staging_placeholder";
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const PLATFORM_APP_ID = process.env.WORLD_APP_ID || "";
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Verify World ID proof
-router.post("/world-id/verify", async (req, res) => {
-  try {
-    const { payload, action, signal } = req.body;
-    if (!payload || !action) {
-      res.status(400).json({ error: "Missing payload or action" });
-      return;
-    }
+// In-memory nonce store: nonce -> expiresAt timestamp
+const pendingNonces = new Map<string, number>();
 
-    // Verify with World ID API
-    const verifyRes = await fetch(`https://developer.worldcoin.org/api/v1/verify/${PLATFORM_APP_ID}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nullifier_hash: payload.nullifier_hash,
-        merkle_root: payload.merkle_root,
-        proof: payload.proof,
-        verification_level: payload.verification_level,
-        action,
-        signal: signal || "",
-      }),
-    });
-
-    const verifyData = await verifyRes.json() as { verified?: boolean; nullifier_hash?: string; credential_type?: string; detail?: string };
-
-    if (!verifyRes.ok) {
-      req.log.warn({ verifyData }, "World ID verification failed");
-      res.status(400).json({ verified: false, error: verifyData.detail || "Verification failed" });
-      return;
-    }
-
-    // Update user's World ID status if logged in
-    const user = getUser(req);
-    if (user) {
-      await db
-        .update(usersTable)
-        .set({
-          isWorldIdVerified: true,
-          nullifierHash: verifyData.nullifier_hash,
-          worldIdCredentialType: verifyData.credential_type || payload.verification_level,
-          updatedAt: new Date(),
-        })
-        .where(eq(usersTable.id, user.id));
-    }
-
-    res.json({
-      verified: true,
-      nullifierHash: verifyData.nullifier_hash,
-      credentialType: verifyData.credential_type || payload.verification_level,
-    });
-  } catch (err) {
-    req.log.error({ err }, "World ID verification error");
-    res.status(500).json({ error: "Verification failed" });
+// Clean up expired nonces periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [nonce, exp] of pendingNonces) {
+    if (exp < now) pendingNonces.delete(nonce);
   }
+}, 60_000);
+
+// ─── GET /auth/nonce ─────────────────────────────────────────────────────────
+// Returns a one-time nonce to embed in the SIWE message
+router.get("/nonce", (req, res) => {
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  pendingNonces.set(nonce, Date.now() + 5 * 60 * 1000); // 5-min TTL
+  res.json({ nonce });
 });
 
-// Wallet auth - create or login user
+// ─── POST /auth/wallet ───────────────────────────────────────────────────────
+// MiniKit walletAuth final payload verification (SIWE)
 router.post("/wallet", async (req, res) => {
   try {
-    const { payload, nonce, address } = req.body;
-    if (!payload || !nonce || !address) {
-      res.status(400).json({ error: "Missing required fields" });
+    const { payload, nonce } = req.body;
+
+    if (!payload || !nonce) {
+      res.status(400).json({ error: "Missing payload or nonce" });
       return;
     }
 
-    // In production: verify SIWE message signature from MiniKit
-    // payload contains the signed message from MiniKit.commands.walletAuth
+    const { status, message, signature, address } = payload as {
+      status: string;
+      message: string;
+      signature: string;
+      address: string;
+    };
+
+    if (status !== "success" || !message || !signature || !address) {
+      res.status(400).json({ error: "Invalid payload" });
+      return;
+    }
+
+    // Validate nonce from in-memory store
+    const nonceExpiry = pendingNonces.get(nonce);
+    if (!nonceExpiry || nonceExpiry < Date.now()) {
+      res.status(400).json({ error: "Invalid or expired nonce" });
+      return;
+    }
+
+    // Verify nonce appears in the SIWE message
+    if (!message.includes(nonce)) {
+      res.status(400).json({ error: "Nonce mismatch in SIWE message" });
+      return;
+    }
+
+    // Verify SIWE signature using viem
+    let signerAddress: string;
+    try {
+      const msgHash = hashMessage(message);
+      signerAddress = await recoverAddress({
+        hash: msgHash,
+        signature: signature as `0x${string}`,
+      });
+    } catch {
+      res.status(400).json({ error: "Invalid signature" });
+      return;
+    }
+
+    if (signerAddress.toLowerCase() !== address.toLowerCase()) {
+      res.status(401).json({ error: "Signature address mismatch" });
+      return;
+    }
+
+    // Consume nonce
+    pendingNonces.delete(nonce);
+
     const walletAddress = address.toLowerCase();
 
     // Find or create user
@@ -86,13 +96,12 @@ router.post("/wallet", async (req, res) => {
 
     let isNew = false;
     if (!user) {
-      // Generate username from address
-      const username = `user_${walletAddress.slice(2, 10)}`;
+      const short = walletAddress.slice(2, 10);
       const [created] = await db
         .insert(usersTable)
         .values({
-          username,
-          displayName: `User ${walletAddress.slice(2, 8)}`,
+          username: `user_${short}`,
+          displayName: `User ${short.slice(0, 6)}`,
           walletAddress,
           role: "fan",
         })
@@ -108,7 +117,6 @@ router.post("/wallet", async (req, res) => {
       .values({ userId: user.id, expiresAt })
       .returning();
 
-    // Set cookie
     res.cookie("sessionId", session.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -118,18 +126,7 @@ router.post("/wallet", async (req, res) => {
     });
 
     res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
-        bannerUrl: user.bannerUrl,
-        walletAddress: user.walletAddress,
-        role: user.role,
-        isWorldIdVerified: user.isWorldIdVerified,
-        createdAt: user.createdAt,
-      },
+      user: serializeUser(user),
       isNew,
     });
   } catch (err) {
@@ -138,10 +135,92 @@ router.post("/wallet", async (req, res) => {
   }
 });
 
-// Get current user
+// ─── POST /auth/world-id/verify ──────────────────────────────────────────────
+// Verify a World ID ZK proof and mark user as verified
+router.post("/world-id/verify", requireAuth, async (req, res) => {
+  try {
+    const user = getUser(req)!;
+    const { payload, action, signal } = req.body;
+
+    if (!payload || !action) {
+      res.status(400).json({ error: "Missing payload or action" });
+      return;
+    }
+
+    if (!PLATFORM_APP_ID) {
+      req.log.warn("WORLD_APP_ID not set, skipping on-chain verify");
+      // Dev bypass: mark as verified anyway
+      await db.update(usersTable).set({
+        isWorldIdVerified: true,
+        worldIdCredentialType: payload.verification_level || "orb",
+        updatedAt: new Date(),
+      }).where(eq(usersTable.id, user.id));
+      res.json({ verified: true, credentialType: payload.verification_level });
+      return;
+    }
+
+    const verifyRes = await fetch(
+      `https://developer.worldcoin.org/api/v1/verify/${PLATFORM_APP_ID}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nullifier_hash: payload.nullifier_hash,
+          merkle_root: payload.merkle_root,
+          proof: payload.proof,
+          verification_level: payload.verification_level,
+          action,
+          signal: signal || user.id,
+        }),
+      }
+    );
+
+    const data = await verifyRes.json() as {
+      verified?: boolean;
+      nullifier_hash?: string;
+      credential_type?: string;
+      detail?: string;
+    };
+
+    if (!verifyRes.ok) {
+      res.status(400).json({ verified: false, error: data.detail || "Verification failed" });
+      return;
+    }
+
+    await db.update(usersTable).set({
+      isWorldIdVerified: true,
+      nullifierHash: data.nullifier_hash,
+      worldIdCredentialType: data.credential_type || payload.verification_level,
+      updatedAt: new Date(),
+    }).where(eq(usersTable.id, user.id));
+
+    res.json({
+      verified: true,
+      nullifierHash: data.nullifier_hash,
+      credentialType: data.credential_type,
+    });
+  } catch (err) {
+    req.log.error({ err }, "World ID verify error");
+    res.status(500).json({ error: "Verification failed" });
+  }
+});
+
+// ─── GET /auth/me ────────────────────────────────────────────────────────────
 router.get("/me", requireAuth, async (req, res) => {
   const user = getUser(req)!;
-  res.json({
+  res.json(serializeUser(user));
+});
+
+// ─── POST /auth/logout ───────────────────────────────────────────────────────
+router.post("/logout", requireAuth, async (req, res) => {
+  const sessionId = (req as any).sessionId;
+  await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId));
+  res.clearCookie("sessionId");
+  res.json({ success: true });
+});
+
+function serializeUser(user: typeof usersTable.$inferSelect) {
+  return {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
@@ -151,16 +230,9 @@ router.get("/me", requireAuth, async (req, res) => {
     walletAddress: user.walletAddress,
     role: user.role,
     isWorldIdVerified: user.isWorldIdVerified,
+    worldIdCredentialType: user.worldIdCredentialType,
     createdAt: user.createdAt,
-  });
-});
-
-// Logout
-router.post("/logout", requireAuth, async (req, res) => {
-  const sessionId = (req as any).sessionId;
-  await db.delete(sessionsTable).where(eq(sessionsTable.id, sessionId));
-  res.clearCookie("sessionId");
-  res.json({ success: true, message: "Logged out" });
-});
+  };
+}
 
 export default router;
